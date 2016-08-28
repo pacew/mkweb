@@ -60,6 +60,7 @@ function find_active_ports () {
 		add_port (port);
 	    }
 	}
+	console.log ("count = " + Object.keys(used_ports).length);
     });
 }
 
