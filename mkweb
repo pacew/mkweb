@@ -1,0 +1,78 @@
+#! /usr/bin/env node
+/* -*- mode:javascript -*- */
+
+"use strict";
+
+var argv = require('minimist')(process.argv.slice(2));
+
+var fs = require ('fs');
+var child_process = require ('child_process');
+var sync = require ("synchronize");
+var sleep = require ("sleep");
+
+function find_apache_ports (used) {
+    var dirs = [ "/etc/apache2",
+		 "/etc/apache2/conf.d",
+		 "/etc/apache2/sites-enabled" ];
+    var files;
+
+    for (var didx = 0; didx < dirs.length; didx++) {
+	var dirname = dirs[didx];
+	files = fs.readdirSync (dirname);
+	for (var fidx = 0; fidx < files.length; fidx++) {
+	    var filename = files[fidx];
+	    if (filename.match (new RegExp ('~$')))
+		continue;
+	    var fullname = dirname + "/" + filename;
+	    try { 
+		var val = fs.readFileSync (fullname, "utf8");
+		var re = new RegExp ("Listen[ \t]*([0-9]*)", 'gim');
+		while ((rematch = re.exec (val)) !== null) {
+		    var port = parseInt (rematch[1]);
+		    if (port)
+			used[port] = 1;
+		}
+	    } catch (e) {
+	    }
+	}
+    }
+
+    return (used);
+}
+
+var used_ports = {"foo":"bar"};
+
+function add_port (port) {
+    used_ports[port] = 1;
+}
+
+function find_active_ports () {
+    sync.fiber (function () {
+	used_ports['abc'] = 1;
+	var cmd = "netstat -n -a --tcp | grep LISTEN";
+	var val = sync.await (child_process.exec (cmd, sync.defer ()));
+	used_ports['def'] = 1;
+	var re = new RegExp (":([1-9][0-9]*)", "g");
+	var rematch;
+	while ((rematch = re.exec (val)) !== null) {
+	    var port = parseInt (rematch[1]);
+	    if (port) {
+		add_port (port);
+	    }
+	}
+    });
+}
+
+
+find_active_ports ();
+process.nextTick (function () {
+    console.log ("done");
+    console.log (used_ports);
+});
+
+
+if (0) {
+    find_apache_ports (used_ports);
+    
+}
+
